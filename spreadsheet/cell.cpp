@@ -125,20 +125,26 @@ Cell::Cell(Sheet& sheet)
 Cell::~Cell() {}
 
 void Cell::Set(std::string text) {
-    std::unique_ptr<Impl> impl;
+    std::unique_ptr<Impl> new_impl;
 
-    if (text.empty()) impl = std::make_unique<EmptyImpl>();
-    else if (text.size() > 1 && text[0] == FORMULA_SIGN) impl = std::make_unique<FormulaImpl>(std::move(text), sheet_);
-    else impl = std::make_unique<TextImpl>(std::move(text));
+    if (text.empty()) {
+        new_impl = std::make_unique<EmptyImpl>();
+    } else if (text.size() > 1 && text[0] == FORMULA_SIGN) {
+        new_impl = std::make_unique<FormulaImpl>(std::move(text), sheet_);
+    } else {
+        new_impl = std::make_unique<TextImpl>(std::move(text));
+    }
 
-    if (WouldIntroduceCircularDependency(*impl)) throw CircularDependencyException("");
-    impl_ = std::move(impl);
+    if (WouldIntroduceCircularDependency(*new_impl)) {
+        throw CircularDependencyException("Circular dependency detected.");
+    }
 
     for (Cell* outgoing : r_nodes_) {
         outgoing->l_nodes_.erase(this);
     }
-
     r_nodes_.clear();
+
+    impl_ = std::move(new_impl);
 
     for (const auto& pos : impl_->GetReferencedCells()) {
         Cell* outgoing = sheet_.GetCellPtr(pos);
@@ -154,9 +160,8 @@ void Cell::Set(std::string text) {
 }
 
 void Cell::Clear() {
-    impl_ = std::make_unique<EmptyImpl>();
+    Set(""); 
 }
-
 Cell::Value Cell::GetValue() const {
     return impl_->GetValue();
 }
